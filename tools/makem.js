@@ -23,12 +23,13 @@ if (!EMSCRIPTEN_PATH) {
 var EMCC = EMSCRIPTEN_PATH ? path.resolve(EMSCRIPTEN_PATH, 'emcc') : 'emcc';
 var EMPP = EMSCRIPTEN_PATH ? path.resolve(EMSCRIPTEN_PATH, 'em++') : 'em++';
 var OPTIMIZE_FLAGS = ' -Oz '; // -Oz for smallest size
-var MEM = 256 * 1024 * 1024; // 64MB
+var MEM = 32 * 1024 * 1024; // 64MB
 
 
 var SOURCE_PATH = path.resolve(__dirname, '../emscripten/') + '/';
 var OUTPUT_PATH = path.resolve(__dirname, '../build/') + '/';
-var BUILD_FILE = 'artoolkit.debug.js';
+var BUILD_DEBUG_FILE = 'artoolkit.debug.js';
+var BUILD_WASM_FILE = 'artoolkit_wasm.js';
 var BUILD_MIN_FILE = 'artoolkit.min.js';
 
 var MAIN_SOURCES = HAVE_NFT ? [
@@ -121,12 +122,15 @@ var FLAGS = '' + OPTIMIZE_FLAGS;
 FLAGS += ' -Wno-warn-absolute-paths ';
 FLAGS += ' -s TOTAL_MEMORY=' + MEM + ' ';
 // FLAGS += ' -s FULL_ES2=1 '
-FLAGS += ' -s NO_BROWSER=1 '; // for 20k less
+//FLAGS += ' -s NO_BROWSER=1 '; // for 20k less
 FLAGS += ' --memory-init-file 0 '; // for memless file
 
 var PRE_FLAGS = ' --pre-js ' + path.resolve(__dirname, '../js/artoolkit.api.js') +' ';
 
 FLAGS += ' --bind ';
+
+var WASM_FLAGS = '' + OPTIMIZE_FLAGS + ' -Wno-warn-absolute-paths ' +
+    ' -s TOTAL_MEMORY=' + 24 * 1024 * 1024 + ' --memory-init-file 0 --bind ' + ' -s ALLOW_MEMORY_GROWTH=1';
 
 /* DEBUG FLAGS */
 var DEBUG_FLAGS = ' -g ';
@@ -208,18 +212,23 @@ var compile_libjpeg = format(EMCC + ' ' + INCLUDES + ' '
 
 var compile_combine = format(EMCC + ' ' + INCLUDES + ' '
 	+ ' {OUTPUT_PATH}*.bc ' + MAIN_SOURCES
-	+ FLAGS + ' '  + DEBUG_FLAGS + DEFINES + ' -o {OUTPUT_PATH}{BUILD_FILE} ',
-	OUTPUT_PATH, OUTPUT_PATH, BUILD_FILE);
+	+ FLAGS + ' -s WASM=0' + ' '  + DEBUG_FLAGS + DEFINES + ' -o {OUTPUT_PATH}{BUILD_FILE} ',
+	OUTPUT_PATH, OUTPUT_PATH, BUILD_DEBUG_FILE);
 
 var compile_combine_min = format(EMCC + ' ' + INCLUDES + ' '
 	+ ' {OUTPUT_PATH}*.bc ' + MAIN_SOURCES
-	+ FLAGS + ' ' + DEFINES + PRE_FLAGS + ' -o {OUTPUT_PATH}{BUILD_FILE} ',
+	+ FLAGS + ' -s WASM=0' + ' ' + DEFINES + PRE_FLAGS + ' -o {OUTPUT_PATH}{BUILD_FILE} ',
 	OUTPUT_PATH, OUTPUT_PATH, BUILD_MIN_FILE);
+
+var compile_wasm = format(EMCC + ' ' + INCLUDES + ' '
+  + ' {OUTPUT_PATH}*.bc ' + MAIN_SOURCES
+  + WASM_FLAGS + DEFINES + PRE_FLAGS + ' -o {OUTPUT_PATH}{BUILD_FILE} ',
+  OUTPUT_PATH, OUTPUT_PATH, BUILD_WASM_FILE);
 
 var compile_all = format(EMCC + ' ' + INCLUDES + ' '
 	+ ar_sources.join(' ')
 	+ FLAGS + ' ' + DEFINES + ' -o {OUTPUT_PATH}{BUILD_FILE} ',
-		OUTPUT_PATH, BUILD_FILE);
+		OUTPUT_PATH, BUILD_DEBUG_FILE);
 
 /*
  * Run commands
@@ -263,6 +272,7 @@ addJob(compile_arlib);
 // compile_kpm
 // addJob(compile_libjpeg);
 addJob(compile_combine);
+addJob(compile_wasm);
 addJob(compile_combine_min);
 // addJob(compile_all);
 
